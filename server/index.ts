@@ -3,10 +3,11 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { WebSocketServer, WebSocket } from "ws";
-import { createServer } from "http";
 import { createSession, getSession, broadcastToAll } from "./sessions.js";
 import { startTranscription, sendAudio, stopTranscription } from "./deepgram.js";
-import pdf from "pdf-parse";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdf = require("pdf-parse");
 
 const app = new Hono();
 
@@ -59,11 +60,14 @@ app.get("/*", async (c) => {
   }
 });
 
-// Create HTTP server
-const httpServer = createServer(app.fetch as any);
+const PORT = parseInt(process.env.PORT || "3001");
 
-// WebSocket server
-const wss = new WebSocketServer({ server: httpServer });
+const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
+  console.log(`Server running on http://localhost:${info.port}`);
+});
+
+// WebSocket server on the same HTTP server
+const wss = new WebSocketServer({ server: server as any });
 
 wss.on("connection", (ws: WebSocket, req) => {
   const url = new URL(req.url || "", `http://${req.headers.host}`);
@@ -99,7 +103,9 @@ wss.on("connection", (ws: WebSocket, req) => {
           broadcastToAll(session, { type: "calibrated" });
         } else if (msg.type === "start_live") {
           session.isLive = true;
-          startTranscription(session);
+          startTranscription(session).catch((err) =>
+            console.error("[WS] Failed to start transcription:", err)
+          );
           broadcastToAll(session, { type: "live_started" });
         } else if (msg.type === "stop_live") {
           session.isLive = false;
@@ -137,9 +143,4 @@ wss.on("connection", (ws: WebSocket, req) => {
       console.log(`[WS] reader disconnected from session ${sessionId}`);
     });
   }
-});
-
-const PORT = parseInt(process.env.PORT || "3001");
-httpServer.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
 });

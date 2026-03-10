@@ -1,17 +1,17 @@
-import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
+import { DeepgramClient } from "@deepgram/sdk";
 import type { Session } from "./sessions.js";
 import { broadcastToReaders } from "./sessions.js";
 import { generateAnswer } from "./llm.js";
 
-const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+const deepgram = new DeepgramClient(process.env.DEEPGRAM_API_KEY!);
 
 // Track active Deepgram connections per session
 const activeConnections = new Map<string, any>();
 
-export function startTranscription(session: Session) {
+export async function startTranscription(session: Session) {
   if (activeConnections.has(session.id)) return activeConnections.get(session.id);
 
-  const connection = deepgram.listen.live({
+  const connection = await deepgram.listen.v1.connect({
     model: "nova-2",
     language: "en",
     smart_format: true,
@@ -24,13 +24,15 @@ export function startTranscription(session: Session) {
     channels: 1,
   });
 
-  connection.on(LiveTranscriptionEvents.Open, () => {
-    console.log(`[Deepgram] Connected for session ${session.id}`);
-  });
+  activeConnections.set(session.id, connection);
 
   let currentUtterance = "";
 
-  connection.on(LiveTranscriptionEvents.Transcript, (data: any) => {
+  connection.on("open", () => {
+    console.log(`[Deepgram] Connected for session ${session.id}`);
+  });
+
+  connection.on("transcript", (data: any) => {
     const transcript = data.channel?.alternatives?.[0]?.transcript;
     if (!transcript || transcript.trim() === "") return;
 
@@ -38,7 +40,6 @@ export function startTranscription(session: Session) {
     const speaker = data.channel?.alternatives?.[0]?.words?.[0]?.speaker;
 
     // If calibrated, skip user's voice (speaker 0 after calibration = user)
-    // This is a simplified approach; real diarization may need tuning
     if (session.isCalibrated && speaker === 0) return;
 
     if (isFinal) {
@@ -52,7 +53,6 @@ export function startTranscription(session: Session) {
           type: "transcript_final",
           text: fullUtterance,
         });
-        // Generate AI answer for this question
         generateAnswer(session, fullUtterance);
       }
     } else {
@@ -63,7 +63,7 @@ export function startTranscription(session: Session) {
     }
   });
 
-  connection.on(LiveTranscriptionEvents.UtteranceEnd, () => {
+  connection.on("utterance_end", () => {
     if (currentUtterance.trim()) {
       session.transcript.push(currentUtterance.trim());
       broadcastToReaders(session, {
@@ -75,16 +75,15 @@ export function startTranscription(session: Session) {
     }
   });
 
-  connection.on(LiveTranscriptionEvents.Error, (err: any) => {
+  connection.on("error", (err: any) => {
     console.error(`[Deepgram] Error for session ${session.id}:`, err);
   });
 
-  connection.on(LiveTranscriptionEvents.Close, () => {
+  connection.on("close", () => {
     console.log(`[Deepgram] Closed for session ${session.id}`);
     activeConnections.delete(session.id);
   });
 
-  activeConnections.set(session.id, connection);
   return connection;
 }
 

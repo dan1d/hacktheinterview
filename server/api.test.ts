@@ -2,13 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock external deps before imports
 vi.mock("@deepgram/sdk", () => ({
-  createClient: () => ({ listen: { live: vi.fn() } }),
-  LiveTranscriptionEvents: {
-    Open: "open",
-    Transcript: "transcript",
-    UtteranceEnd: "utteranceEnd",
-    Error: "error",
-    Close: "close",
+  DeepgramClient: class {
+    listen = { v1: { connect: vi.fn().mockResolvedValue({ on: vi.fn(), send: vi.fn(), finish: vi.fn() }) } };
   },
 }));
 vi.mock("openai", () => ({

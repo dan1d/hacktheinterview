@@ -2,10 +2,16 @@ import OpenAI from "openai";
 import type { Session } from "./sessions.js";
 import { broadcastToReaders } from "./sessions.js";
 
-const client = new OpenAI({
-  baseURL: "https://api.deepseek.com",
-  apiKey: process.env.DEEPSEEK_API_KEY!,
-});
+let client: OpenAI;
+function getClient() {
+  if (!client) {
+    client = new OpenAI({
+      baseURL: "https://api.deepseek.com",
+      apiKey: process.env.DEEPSEEK_API_KEY!,
+    });
+  }
+  return client;
+}
 
 export function buildSystemPrompt(session: Session): string {
   let prompt = `You are an expert interview coach. The user is in a live ${session.interviewType} interview right now.
@@ -42,7 +48,7 @@ export async function generateAnswer(session: Session, question: string) {
       question,
     });
 
-    const stream = await client.chat.completions.create({
+    const stream = await getClient().chat.completions.create({
       model: "deepseek-chat",
       messages: [
         { role: "system", content: systemPrompt },
