@@ -9,6 +9,7 @@
     "build:client": "vite build",
     "start": "node --import tsx server/index.ts",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^9.2.1",
     "jsdom": "^28.1.0",
     "react": "^19.2.4",
