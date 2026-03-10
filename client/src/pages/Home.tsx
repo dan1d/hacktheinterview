@@ -19,6 +19,7 @@ export function Home() {
   const [interviewType, setInterviewType] = useState("Ruby");
   const [customPrompt, setCustomPrompt] = useState("");
   const [resume, setResume] = useState<File | null>(null);
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -27,6 +28,7 @@ export function Home() {
     form.append("interviewType", interviewType);
     form.append("customPrompt", customPrompt);
     if (resume) form.append("resume", resume);
+    if (linkedinUrl) form.append("linkedinUrl", linkedinUrl);
 
     const res = await fetch("/api/session", { method: "POST", body: form });
     const { sessionId } = await res.json();
@@ -66,13 +68,30 @@ export function Home() {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Resume (PDF)</label>
+          <label style={styles.label}>LinkedIn Profile URL</label>
+          <input
+            type="url"
+            value={linkedinUrl}
+            onChange={(e) => setLinkedinUrl(e.target.value)}
+            placeholder="https://linkedin.com/in/yourprofile"
+            style={styles.select}
+          />
+          <span style={{ fontSize: 11, color: "#666", marginTop: 4, display: "block" }}>
+            We'll extract your profile info for personalized answers
+          </span>
+        </div>
+
+        <div style={styles.field}>
+          <label style={styles.label}>Resume (PDF) — optional</label>
           <input
             type="file"
             accept=".pdf"
             onChange={(e) => setResume(e.target.files?.[0] || null)}
             style={styles.fileInput}
           />
+          <span style={{ fontSize: 11, color: "#666", marginTop: 4, display: "block" }}>
+            Tip: Export from LinkedIn → Profile → More → Save to PDF
+          </span>
         </div>
 
         <button

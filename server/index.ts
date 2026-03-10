@@ -5,6 +5,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { WebSocketServer, WebSocket } from "ws";
 import { createSession, getSession, broadcastToAll } from "./sessions.js";
 import { startTranscription, sendAudio, stopTranscription } from "./deepgram.js";
+import { fetchLinkedInProfile } from "./linkedin.js";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdf = require("pdf-parse");
@@ -18,6 +19,8 @@ app.post("/api/session", async (c) => {
   const customPrompt = (formData.get("customPrompt") as string) || "";
   const resumeFile = formData.get("resume") as File | null;
 
+  const linkedinUrl = (formData.get("linkedinUrl") as string) || "";
+
   let resumeText = "";
   if (resumeFile) {
     const buffer = Buffer.from(await resumeFile.arrayBuffer());
@@ -29,7 +32,20 @@ app.post("/api/session", async (c) => {
     }
   }
 
-  const session = createSession({ interviewType, customPrompt, resumeText });
+  // Fetch LinkedIn profile if URL provided
+  let linkedinText = "";
+  if (linkedinUrl) {
+    try {
+      linkedinText = await fetchLinkedInProfile(linkedinUrl);
+    } catch (e: any) {
+      console.error("LinkedIn fetch error:", e.message);
+    }
+  }
+
+  // Combine resume + LinkedIn as context
+  const fullResumeText = [resumeText, linkedinText].filter(Boolean).join("\n\n---\n\n");
+
+  const session = createSession({ interviewType, customPrompt, resumeText: fullResumeText });
   return c.json({ sessionId: session.id });
 });
 
